@@ -98,9 +98,18 @@ All checks passed. The Day 1 question still works, and the records did not chang
 
 ## Homework 2 results
 A small dispatcher that checks a tool call before running it: **7 / 7 cases passed**, records unchanged.
-- Only the `check_status` tool is allowed. Other tools are refused.
-- Wrong arguments or a wrong call shape are refused.
-- Another user's request returns `unavailable`.
+
+| # | Tool call | Result | Why |
+|---|---|---|---|
+| 1 | `check_status` REF-1001 | ok → under_review | My request |
+| 2 | `check_status` REF-1002 | unavailable | Another user's request |
+| 3 | `check_status` REF-9999 | unavailable | Does not exist |
+| 4 | `delete_record` REF-1001 | tool_not_allowed | Only `check_status` is allowed |
+| 5 | `check_status` + `owner` argument | invalid_arguments | The owner comes from the session, not the call |
+| 6 | `check_status` with number `1001` | invalid_arguments | Reference must be a text like `REF-1001` |
+| 7 | Plain text instead of a call | invalid_call | Wrong call shape |
+
+Cases 2–7 are **correct refusals**, not errors.
 
 **Validation vs. authorization:** validation checks that the request is written correctly. Authorization checks that this user is allowed to see the result.
 
