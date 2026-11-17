@@ -13,6 +13,7 @@ All data is fake (synthetic).
 - `homework/day1_real_model.ipynb` — Homework 1
 - `homework/day2_tools.ipynb` — Homework 2
 - `homework/day3_errors.ipynb` — Homework 3
+- `homework/day4_evaluation.ipynb` — Homework 4
 - `results/` — the JSON files from my runs
 
 ## Software structure
@@ -26,16 +27,23 @@ murshid-renad/
 ├── homework/
 │   ├── day1_real_model.ipynb
 │   ├── day2_tools.ipynb
-│   └── day3_errors.ipynb
+│   ├── day3_errors.ipynb
+│   └── day4_evaluation.ipynb
 └── results/
     ├── core/              # JSON results from the main project
     │   ├── baseline_results.json
     │   ├── day2_results.json
-    │   └── day3_results.json
+    │   ├── day3_results.json
+    │   ├── day4_results.json
+    │   ├── final_report.json
+    │   ├── metrics.json
+    │   └── synthetic_data.json
     ├── day1/
     │   └── live_demo_result.json
-    └── day2/
-        └── tools_result.json
+    ├── day2/
+    │   └── tools_result.json
+    └── day4/
+        └── evaluation_result.json
 ```
 
 ### Parts of the program
@@ -55,10 +63,16 @@ murshid-renad/
 | `validate_response()` | 7 | Checks the answer has the right shape |
 | `run_pipeline()` | 8 | The full path: guard → route → check the answer |
 | `GOLDEN_CASES` / `evaluate()` | 9 | 10 fixed tests and a pass/fail report |
+| `CACHE` / `run_app()` | 11 | Saves answers to the 2 public questions so they are not asked again |
+| `METRICS` | 11 | Logs code, cache hit, calls and time (no questions or private data) |
+| Cache experiment | 12 | Compares 3 requests without and with the cache |
+| `final_report` | 13 | Final tests, cache results, example cost and limits |
+| ZIP export | 14 | Puts all JSON results in one file |
 
 ### How a question moves
 ```
-Question → guard_input() → blocked? → refuse
+Question → run_app() → public question already in CACHE? → answer from cache
+         → guard_input() → blocked? → refuse
          → route() → refuse "cancel"?
                    → extract_ticket() → validate_ticket()
                    → no reference?  → ask for the reference number
@@ -71,10 +85,10 @@ Question → guard_input() → blocked? → refuse
 - Day 1 ✅
 - Day 2 ✅
 - Day 3 ✅
-- Day 4
+- Day 4 ✅
 
 ## How to run
-Open the notebook in Google Colab, choose CPU, and run the cells in order.
+Open the notebook in Google Colab, choose CPU, then **Runtime → Restart session and run all**. All 14 cells should pass.
 
 ## Day 1 results
 | Question | Answer |
@@ -162,9 +176,58 @@ I tested wrong inputs on purpose. The program caught each error and did not cras
 
 A caught rejection is a **successful test**, because the program refused the wrong input as expected.
 
+## Final results (Day 4)
+- **Mode:** mock · **External model API calls: 0**
+- **Final tests:** 10 / 10 passed (the Day 3 tests, run again with the cache).
+- I restarted the runtime and ran all cells from the top. Everything passed again.
+
+### Cache experiment
+The same public question was asked 3 times.
+
+| | Without cache | With cache |
+|---|---:|---:|
+| Requests | 3 | 3 |
+| FakeClient calls | 3 | 1 |
+| Cache hits | 0 | 2 (`false, true, true`) |
+| Hit rate | 0% | 66.7% |
+
+Extra checks passed:
+- A new prompt version or directory version → no cache hit (old answers are not reused).
+- After 300 seconds the saved answer expires.
+- Application status questions (REF-1001, REF-9999, REF-1002) are **never** saved in the cache.
+
+### Example cost (not real)
+1,000 input tokens + 400 output tokens, with made-up prices ($2 / $4 per million) = **$0.0036 per request**.
+This is only an example. **Actual cost = $0**, because no real API is used.
+
+### One improvement for the future
+Connect a real language model behind the same `ask()` interface, and keep all the guards, checks and tests.
+
+## Homework 4 results
+I asked the real small model (`google/flan-t5-small`, CPU) the same question in 3 different ways.
+Settings: `do_sample=False`, `num_beams=1`, `max_new_tokens=48` · External API calls: 0.
+
+| Case | Question | Answer | Has "reference" + "number"? | Input / output tokens | Time (s) |
+|---|---|---|---|---|---|
+| E01 | How can I check my application status? | Use its reference number | ✅ | 34 / 6 | 1.996 |
+| E02 | What do I need to check my application status? | Reference number | ✅ | 36 / 4 | 0.671 |
+| E03 | How can I find out the status of my application? | Use its reference number | ✅ | 37 / 6 | 1.016 |
+
+**Keyword hits: 3 / 3.** This only checks two words. It is **not** a full accuracy score.
+
+**My manual review:**
+- E01 ✅ Correct and matches the context. Nothing made up.
+- E02 ✅ Correct but very short. It says what you need, not how to use it.
+- E03 ✅ Correct and matches the context. Nothing made up.
+
+**Limitation:** 3 questions with the same meaning are too few to judge the model. All are in English.
+**Improvement:** add more questions (including Arabic and questions with no answer in the context) and review each answer by meaning, not only by keywords.
+
 ## Limitations
 - `FakeClient` does not understand language. It only knows exact questions.
 - Passing the tests does not mean it is a smart AI.
 - All data is fake.
 - `demo-user-1` is a test user, not a real login system.
 - The guards only look for some words. They can miss new tricks.
+- The cache only works for 2 exact questions.
+- Times in milliseconds are Python time on Colab, not real model speed.
